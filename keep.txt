@@ -1,0 +1,44 @@
+resource "random_id" "rand" {
+    byte_length = 4
+}
+
+resource "google_storage_bucket" "bucket" {
+    name = lower("${var.bucket_generic_name}-${random_id.rand.hex}")
+    location = var.region
+    force_destroy = true
+
+    website {
+        main_page_suffix = "index.html"
+        not_found_page = "404.html"
+    }
+
+    cors {
+        origin = ["*"]
+        response_header = ["Origin", "X-Requested-With", "Content-Type", "Accept"]
+        method = ["GET", "HEAD", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
+        max_age_seconds = 3600
+    }
+
+    lifecycle_rule {
+      action {
+        type = "Delete"
+      }
+      condition {
+        age = 1
+      }
+    }
+}
+
+resource "google_project_service" "cloudrun" {
+    provider = google
+    service = "run.googleapis.com"
+    disable_on_destroy = false
+
+    template {
+        spec {
+            containers {
+                image = "gcr.io/${google_project_service.cloudrun.project}/${output}}"
+            }
+        }
+    }
+}
